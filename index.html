@@ -1,33 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>간단한 숫자 공유 페이지</title>
+    <title>실시간 숫자 공유 페이지</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <style>
+        #displayArea {
+            font-size: 2em;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <h1>숫자를 입력하세요</h1>
-    <input type="text" id="numberInput">
-    <button onclick="displayAndClearNumber()">제출</button>
+    <input type="number" id="numberInput">
+    <button onclick="uploadNumber()">제출</button>
     <div id="displayArea"></div>
 
     <script>
+        // Firebase 설정 (Firebase 콘솔에서 얻은 정보로 대체)
+        const firebaseConfig = {
+          apiKey: "YOUR_API_KEY",
+          authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+          databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+          projectId: "YOUR_PROJECT_ID",
+          storageBucket: "YOUR_PROJECT_ID.appspot.com",
+          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+          appId: "YOUR_APP_ID"
+        };
+
+        // Firebase 앱 초기화
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const numberRef = database.ref('sharedNumber');
         let timeoutId;
-        const displayArea = document.getElementById('displayArea');
-        const numberInput = document.getElementById('numberInput');
 
-        function displayAndClearNumber() {
-            const number = numberInput.value;
-            displayArea.textContent = "입력된 숫자: " + number;
-            numberInput.value = ""; // 입력 필드 초기화
+        // 데이터베이스에서 숫자 읽어와 표시
+        numberRef.on('value', (snapshot) => {
+            const number = snapshot.val();
+            document.getElementById('displayArea').textContent = number !== null ? "현재 숫자: " + number : "";
 
-            // 이전 타이머가 있다면 취소
+            // 이전 타이머가 있다면 취소하고 새로 설정
             if (timeoutId) {
                 clearTimeout(timeoutId);
             }
+            if (number !== null) {
+                timeoutId = setTimeout(() => {
+                    numberRef.remove(); // 5분 후 데이터 삭제
+                }, 300000);
+            }
+        });
 
-            // 5분 뒤에 내용 지우기
-            timeoutId = setTimeout(() => {
-                displayArea.textContent = "";
-            }, 300000);
+        // 입력한 숫자를 데이터베이스에 업로드
+        function uploadNumber() {
+            const numberInput = document.getElementById('numberInput');
+            const number = numberInput.value;
+            numberRef.set(number); // 데이터베이스에 값 쓰기
+            numberInput.value = ""; // 입력 필드 초기화
         }
     </script>
 </body>
