@@ -1,69 +1,34 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>숫자 공유 사이트</title>
-    <meta charset="utf-8" />
-    <script src="https://apis.google.com/js/api.js"></script>
+<head>
+    <title>간단한 숫자 공유 페이지</title>
+</head>
+<body>
+    <h1>숫자를 입력하세요</h1>
+    <input type="text" id="numberInput">
+    <button onclick="displayAndClearNumber()">제출</button>
+    <div id="displayArea"></div>
+
     <script>
-      const API_KEY = 'YOUR_API_KEY'; // 생성한 API 키로 교체
-      const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID'; // 시트 ID로 교체
-      const RANGE = 'Sheet1!A:A'; // 데이터를 추가할 시트와 범위
+        let timeoutId;
+        const displayArea = document.getElementById('displayArea');
+        const numberInput = document.getElementById('numberInput');
 
-      function initClient() {
-        gapi.client.init({
-          apiKey: API_KEY,
-          discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
-        }).then(() => {
-          loadData();
-        });
-      }
+        function displayAndClearNumber() {
+            const number = numberInput.value;
+            displayArea.textContent = "입력된 숫자: " + number;
+            numberInput.value = ""; // 입력 필드 초기화
 
-      function loadGapi() {
-        gapi.load('client', initClient);
-      }
+            // 이전 타이머가 있다면 취소
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
 
-      function submitNumber() {
-        const input = document.getElementById('numberInput');
-        const value = input.value;
-        if (!value) return;
-
-        const params = {
-          spreadsheetId: SPREADSHEET_ID,
-          range: RANGE,
-          valueInputOption: 'USER_ENTERED',
-        };
-
-        const valueRangeBody = {
-          values: [[value]],
-        };
-
-        gapi.client.sheets.spreadsheets.values.append(params, valueRangeBody).then(() => {
-          input.value = '';
-          loadData();
-        });
-      }
-
-      function loadData() {
-        gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: RANGE,
-        }).then(response => {
-          const data = response.result.values || [];
-          const list = document.getElementById('numberList');
-          list.innerHTML = '';
-          data.forEach(row => {
-            const li = document.createElement('li');
-            li.textContent = row[0];
-            list.appendChild(li);
-          });
-        });
-      }
+            // 5분 뒤에 내용 지우기
+            timeoutId = setTimeout(() => {
+                displayArea.textContent = "";
+            }, 300000);
+        }
     </script>
-  </head>
-  <body onload="loadGapi()">
-    <h1>숫자 공유 사이트</h1>
-    <input type="number" id="numberInput" placeholder="숫자를 입력하세요" />
-    <button onclick="submitNumber()">제출</button>
-    <ul id="numberList"></ul>
-  </body>
+</body>
 </html>
