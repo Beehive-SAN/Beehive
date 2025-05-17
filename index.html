@@ -113,6 +113,18 @@
     </style>
 </head>
 <body>
+    <button id="hostButton">HOST</button>
+
+    <div id="inputContainer" class="input-container">
+        <input type="text" id="userId" placeholder="ID를 입력하세요">
+        <input type="text" id="textContent" placeholder="최대 10글자 내용">
+        <input type="tel" id="phoneNumber" placeholder="XXX-XXX-XXXX">
+        <button id="submitButton">확인</button>
+    </div>
+
+    <div id="circleArea">
+        </div>
+
     <script type="module">
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
@@ -132,18 +144,7 @@
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
 </script>
-    <button id="hostButton">HOST</button>
-
-    <div id="inputContainer" class="input-container">
-        <input type="text" id="userId" placeholder="ID를 입력하세요">
-        <input type="text" id="textContent" placeholder="최대 10글자 내용">
-        <input type="tel" id="phoneNumber" placeholder="XXX-XXX-XXXX">
-        <button id="submitButton">확인</button>
-    </div>
-
-    <div id="circleArea">
-        </div>
-
+    
     <script>
         const hostButton = document.getElementById('hostButton');
         const inputContainer = document.getElementById('inputContainer');
