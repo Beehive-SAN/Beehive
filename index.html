@@ -1,63 +1,165 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>실시간 숫자 공유 페이지</title>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나만의 페이지</title>
     <style>
-        #displayArea {
-            font-size: 2em;
-            margin-top: 10px;
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        #hostButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+
+        .input-container {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .input-container input[type="text"],
+        .input-container input[type="tel"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .input-container button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+        }
+
+        .circle-container {
+            position: relative;
+        }
+
+        .circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #ddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            position: absolute; /* 초기 위치는 JavaScript로 설정 */
+        }
+
+        .circle.selected {
+            background-color: orange; /* 선택되었을 때 색상 변경 */
+        }
+
+        .join-button {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: white;
+            display: none; /* 초기에는 숨김 */
         }
     </style>
 </head>
 <body>
-    <h1>숫자를 입력하세요</h1>
-    <input type="number" id="numberInput">
-    <button onclick="uploadNumber()">제출</button>
-    <div id="displayArea"></div>
+    <button id="hostButton">HOST</button>
+
+    <div id="inputContainer" class="input-container">
+        <input type="text" id="userId" placeholder="ID를 입력하세요">
+        <input type="text" id="textContent" placeholder="최대 10글자 내용">
+        <input type="tel" id="phoneNumber" placeholder="XXX-XXX-XXXX">
+        <button id="submitButton">확인</button>
+    </div>
+
+    <div id="circleArea" class="circle-container">
+        </div>
 
     <script>
-        // Firebase 설정 (Firebase 콘솔에서 얻은 정보로 대체)
-        const firebaseConfig = {
-          apiKey: "YOUR_API_KEY",
-          authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-          databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-          projectId: "YOUR_PROJECT_ID",
-          storageBucket: "YOUR_PROJECT_ID.appspot.com",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-          appId: "YOUR_APP_ID"
-        };
+        const hostButton = document.getElementById('hostButton');
+        const inputContainer = document.getElementById('inputContainer');
+        const submitButton = document.getElementById('submitButton');
+        const circleArea = document.getElementById('circleArea');
 
-        // Firebase 앱 초기화
-        const app = firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        const numberRef = database.ref('sharedNumber');
-        let timeoutId;
-
-        // 데이터베이스에서 숫자 읽어와 표시
-        numberRef.on('value', (snapshot) => {
-            const number = snapshot.val();
-            document.getElementById('displayArea').textContent = number !== null ? "현재 숫자: " + number : "";
-
-            // 이전 타이머가 있다면 취소하고 새로 설정
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-            }
-            if (number !== null) {
-                timeoutId = setTimeout(() => {
-                    numberRef.remove(); // 5분 후 데이터 삭제
-                }, 300000);
-            }
+        hostButton.addEventListener('click', () => {
+            inputContainer.style.display = 'flex';
         });
 
-        // 입력한 숫자를 데이터베이스에 업로드
-        function uploadNumber() {
-            const numberInput = document.getElementById('numberInput');
-            const number = numberInput.value;
-            numberRef.set(number); // 데이터베이스에 값 쓰기
-            numberInput.value = ""; // 입력 필드 초기화
-        }
+        submitButton.addEventListener('click', () => {
+            const userId = document.getElementById('userId').value;
+            const textContent = document.getElementById('textContent').value.substring(0, 10); // 최대 10글자 제한
+            const phoneNumber = document.getElementById('phoneNumber').value;
+
+            // 전화번호 포맷 검사
+            const phoneRegex = /^\d{3}-\d{3}-\d{4}$/;
+            if (!phoneRegex.test(phoneNumber)) {
+                alert('전화번호 형식을 XXX-XXX-XXXX로 입력해주세요.');
+                return;
+            }
+
+            inputContainer.style.display = 'none';
+
+            const circle = document.createElement('div');
+            circle.classList.add('circle');
+            circle.textContent = textContent;
+
+            // 원의 초기 위치를 랜덤하게 설정
+            const maxX = circleArea.offsetWidth - 100;
+            const maxY = circleArea.offsetHeight - 100;
+            const randomX = Math.random() * maxX;
+            const randomY = Math.random() * maxY;
+            circle.style.left = `${randomX}px`;
+            circle.style.top = `${randomY}px`;
+
+            const joinButton = document.createElement('button');
+            joinButton.classList.add('join-button');
+            joinButton.textContent = 'JOIN';
+            circle.appendChild(joinButton);
+
+            circle.addEventListener('click', () => {
+                circle.classList.toggle('selected');
+                joinButton.style.display = circle.classList.contains('selected') ? 'block' : 'none';
+            });
+
+            circleArea.appendChild(circle);
+
+            // 입력 필드 초기화
+            document.getElementById('userId').value = '';
+            document.getElementById('textContent').value = '';
+            document.getElementById('phoneNumber').value = '';
+        });
     </script>
 </body>
 </html>
