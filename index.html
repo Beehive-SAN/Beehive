@@ -113,6 +113,25 @@
     </style>
 </head>
 <body>
+    <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBpbl_aQO5DskYnR2MSq6k-zjAFXI-dvps",
+    authDomain: "project-e600e.firebaseapp.com",
+    projectId: "project-e600e",
+    storageBucket: "project-e600e.firebasestorage.app",
+    messagingSenderId: "75806384501",
+    appId: "1:75806384501:web:67e6cce23bdff9e926b33c"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
     <button id="hostButton">HOST</button>
 
     <div id="inputContainer" class="input-container">
