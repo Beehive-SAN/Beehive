@@ -13,6 +13,7 @@
             min-height: 100vh;
             margin: 0;
             background-color: #f4f4f4;
+            position: relative; /* circleArea의 기준 */
         }
 
         #hostButton {
@@ -56,22 +57,28 @@
             color: white;
         }
 
-        .circle-container {
+        #circleArea {
             position: relative;
+            width: 80vw; /* 화면 너비의 80% */
+            height: 80vh; /* 화면 높이의 80% */
         }
 
         .circle {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
+            width: auto; /* 내용에 따라 너비 자동 조정 */
+            padding: 10px;
+            border-radius: 15px; /* 둥근 모양 유지 */
             background-color: #ddd;
             display: flex;
+            flex-direction: column; /* ID, 내용, 번호를 세로로 배치 */
             justify-content: center;
             align-items: center;
             font-weight: bold;
             cursor: pointer;
             user-select: none;
-            position: absolute; /* 초기 위치는 JavaScript로 설정 */
+            position: absolute;
+            text-align: center;
+            box-sizing: border-box; /* padding이 너비/높이에 포함되도록 */
+            min-width: 80px; /* 최소 너비 설정 */
         }
 
         .circle.selected {
@@ -104,7 +111,7 @@
         <button id="submitButton">확인</button>
     </div>
 
-    <div id="circleArea" class="circle-container">
+    <div id="circleArea">
         </div>
 
     <script>
@@ -112,6 +119,28 @@
         const inputContainer = document.getElementById('inputContainer');
         const submitButton = document.getElementById('submitButton');
         const circleArea = document.getElementById('circleArea');
+        const circles = []; // 생성된 동그라미들을 저장할 배열
+        const circleRadius = 50; // 동그라미의 반지름 (겹침 방지 계산에 사용)
+
+        function isColliding(newCircle) {
+            for (const existingCircle of circles) {
+                const dx = newCircle.x - existingCircle.x;
+                const dy = newCircle.y - existingCircle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < 2 * circleRadius) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function generateRandomPosition() {
+            const maxX = circleArea.offsetWidth - 2 * circleRadius;
+            const maxY = circleArea.offsetHeight - 2 * circleRadius;
+            const x = Math.random() * maxX + circleRadius;
+            const y = Math.random() * maxY + circleRadius;
+            return { x, y };
+        }
 
         hostButton.addEventListener('click', () => {
             inputContainer.style.display = 'flex';
@@ -131,29 +160,38 @@
 
             inputContainer.style.display = 'none';
 
-            const circle = document.createElement('div');
-            circle.classList.add('circle');
-            circle.textContent = textContent;
+            const circleDiv = document.createElement('div');
+            circleDiv.classList.add('circle');
+            circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
 
-            // 원의 초기 위치를 랜덤하게 설정
-            const maxX = circleArea.offsetWidth - 100;
-            const maxY = circleArea.offsetHeight - 100;
-            const randomX = Math.random() * maxX;
-            const randomY = Math.random() * maxY;
-            circle.style.left = `${randomX}px`;
-            circle.style.top = `${randomY}px`;
+            let position;
+            let collision = true;
+            let maxAttempts = 100; // 겹침 방지 시도 횟수 제한
 
-            const joinButton = document.createElement('button');
-            joinButton.classList.add('join-button');
-            joinButton.textContent = 'JOIN';
-            circle.appendChild(joinButton);
+            for (let i = 0; i < maxAttempts && collision; i++) {
+                position = generateRandomPosition();
+                collision = isColliding({ x: position.x, y: position.y });
+            }
 
-            circle.addEventListener('click', () => {
-                circle.classList.toggle('selected');
-                joinButton.style.display = circle.classList.contains('selected') ? 'block' : 'none';
-            });
+            if (!collision) {
+                circleDiv.style.left = `${position.x - circleRadius}px`;
+                circleDiv.style.top = `${position.y - circleRadius}px`;
 
-            circleArea.appendChild(circle);
+                const joinButton = document.createElement('button');
+                joinButton.classList.add('join-button');
+                joinButton.textContent = 'JOIN';
+                circleDiv.appendChild(joinButton);
+
+                circleDiv.addEventListener('click', () => {
+                    circleDiv.classList.toggle('selected');
+                    joinButton.style.display = circleDiv.classList.contains('selected') ? 'block' : 'none';
+                });
+
+                circleArea.appendChild(circleDiv);
+                circles.push({ x: position.x, y: position.y });
+            } else {
+                alert('더 이상 겹치지 않는 위치를 찾을 수 없습니다.');
+            }
 
             // 입력 필드 초기화
             document.getElementById('userId').value = '';
