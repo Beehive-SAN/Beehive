@@ -125,11 +125,9 @@
     <div id="circleArea">
         </div>
 
-    <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+    <script>
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
   // Your web app's Firebase configuration
   const firebaseConfig = {
@@ -143,114 +141,176 @@
 
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app); // Firestore 인스턴스 가져오기
+
+  const hostButton = document.getElementById('hostButton');
+  const inputContainer = document.getElementById('inputContainer');
+  const submitButton = document.getElementById('submitButton');
+  const circleArea = document.getElementById('circleArea');
+  const circles = []; // 생성된 동그라미들을 저장할 배열
+  const circleMinDistance = 100; // 최소 간격
+
+  function isColliding(newCircle) {
+    for (const existingCircle of circles) {
+      const dx = newCircle.x - existingCircle.x;
+      const dy = newCircle.y - existingCircle.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const minDistance = (newCircle.offsetWidth / 2) + (existingCircle.offsetWidth / 2) + circleMinDistance;
+      if (distance < minDistance) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function generateRandomPosition(elementWidth, elementHeight) {
+    const minX = circleArea.offsetLeft;
+    const maxX = circleArea.offsetLeft + circleArea.offsetWidth - elementWidth;
+    const minY = circleArea.offsetTop;
+    const maxY = circleArea.offsetTop + circleArea.offsetHeight - elementHeight;
+    const x = Math.random() * (maxX - minX) + minX;
+    const y = Math.random() * (maxY - minY) + minY;
+    return { x, y };
+  }
+
+  function createCircleElement(userId, textContent, phoneNumber, left, top, docId) {
+    const circleDiv = document.createElement('div');
+    circleDiv.classList.add('circle');
+    circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
+    circleDiv.style.left = `${left}px`;
+    circleDiv.style.top = `${top}px`;
+    circleDiv.dataset.docId = docId; // 문서 ID를 data 속성에 저장
+
+    const joinButton = document.createElement('button');
+    joinButton.classList.add('join-button');
+    joinButton.textContent = 'JOIN';
+    circleDiv.appendChild(joinButton);
+
+    circleDiv.addEventListener('click', () => {
+      circleDiv.classList.toggle('selected');
+      joinButton.style.display = circleDiv.classList.contains('selected') ? 'block' : 'none';
+    });
+
+    circleArea.appendChild(circleDiv);
+    circles.push({ element: circleDiv, id: docId });
+  }
+
+  hostButton.addEventListener('click', () => {
+    inputContainer.style.display = 'flex';
+  });
+
+  submitButton.addEventListener('click', () => {
+    const userId = document.getElementById('userId').value;
+    const textContent = document.getElementById('textContent').value.substring(0, 10); // 최대 10글자 제한
+    const phoneNumber = document.getElementById('phoneNumber').value;
+
+    // 전화번호 포맷 검사
+    const phoneRegex = /^\d{3}-\d{3}-\d{4}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      alert('전화번호 형식을 XXX-XXX-XXXX로 입력해주세요.');
+      return;
+    }
+
+    inputContainer.style.display = 'none';
+
+    const circleDiv = document.createElement('div');
+    circleDiv.classList.add('circle');
+    circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
+
+    let position;
+    let collision = true;
+    let maxAttempts = 100; // 겹침 방지 시도 횟수 제한
+
+    for (let i = 0; i < maxAttempts && collision; i++) {
+      const randomPosition = generateRandomPosition(100, 80); // 초기 크기 추정
+      circleDiv.style.left = `${randomPosition.x}px`;
+      circleDiv.style.top = `${randomPosition.y}px`;
+      collision = isColliding({
+        x: randomPosition.x + (circleDiv.offsetWidth / 2 || 50), // 초기 추정 또는 실제 너비
+        y: randomPosition.y + (circleDiv.offsetHeight / 2 || 40), // 초기 추정 또는 실제 높이
+        offsetWidth: circleDiv.offsetWidth || 100,
+        offsetHeight: circleDiv.offsetHeight || 80
+      });
+      if (!collision) {
+        position = randomPosition;
+      }
+    }
+
+    if (position) {
+      // Firestore에 데이터 추가
+      addDoc(collection(db, "circles"), {
+        userId: userId,
+        textContent: textContent,
+        phoneNumber: phoneNumber,
+        position: {
+          left: position.x - circleArea.offsetLeft,
+          top: position.y - circleArea.offsetTop
+        },
+        createdAt: serverTimestamp()
+      })
+      .then((docRef) => {
+        console.log("Document written with ID: ", docRef.id);
+        createCircleElement(userId, textContent, phoneNumber, position.x - circleArea.offsetLeft, position.y - circleArea.offsetTop, docRef.id);
+
+        // 5분 뒤에 사라지도록 설정 (Firestore에서도 삭제)
+        setTimeout(() => {
+          const circleToRemove = circles.find(c => c.id === docRef.id);
+          if (circleToRemove) {
+            circleToRemove.element.remove();
+            const index = circles.indexOf(circleToRemove);
+            if (index > -1) {
+              circles.splice(index, 1);
+            }
+            deleteDoc(doc(db, "circles", docRef.id));
+            console.log("Document with ID ", docRef.id, " deleted after 5 minutes.");
+          }
+        }, 5 * 60 * 1000);
+      })
+      .catch((error) => {
+        console.error("Error adding document: ", error);
+      });
+    } else {
+      alert('더 이상 겹치지 않는 위치를 찾을 수 없습니다.');
+    }
+
+    // 입력 필드 초기화
+    document.getElementById('userId').value = '';
+    document.getElementById('textContent').value = '';
+    document.getElementById('phoneNumber').value = '';
+  });
+
+  // 페이지 로드 시 Firestore 데이터 불러오기 및 실시간 감시
+  onSnapshot(collection(db, "circles"), (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === "added") {
+        const data = change.doc.data();
+        createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, change.doc.id);
+      }
+      if (change.type === "removed") {
+        const removedCircle = circles.find(c => c.id === change.doc.id);
+        if (removedCircle) {
+          removedCircle.element.remove();
+          const index = circles.indexOf(removedCircle);
+          if (index > -1) {
+            circles.splice(index, 1);
+          }
+        }
+      }
+      // "modified" 이벤트는 필요에 따라 처리
+    });
+  });
+
+  // 초기 로딩 시 기존 데이터 불러오기 (onSnapshot에서 added 이벤트로 처리되므로 중복 방지)
+  // getDocs(collection(db, "circles"))
+  //   .then((querySnapshot) => {
+  //     querySnapshot.forEach((doc) => {
+  //       const data = doc.data();
+  //       createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, doc.id);
+  //     });
+  //   })
+  //   .catch((error) => {
+  //     console.error("Error getting documents: ", error);
+  //   });
 </script>
-    
-    <script>
-        const hostButton = document.getElementById('hostButton');
-        const inputContainer = document.getElementById('inputContainer');
-        const submitButton = document.getElementById('submitButton');
-        const circleArea = document.getElementById('circleArea');
-        const circles = []; // 생성된 동그라미들을 저장할 배열
-        const circleMinDistance = 100; // 최소 간격
-
-        function isColliding(newCircle) {
-            for (const existingCircle of circles) {
-                const dx = newCircle.x - existingCircle.x;
-                const dy = newCircle.y - existingCircle.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const minDistance = (newCircle.offsetWidth / 2) + (existingCircle.offsetWidth / 2) + circleMinDistance;
-                if (distance < minDistance) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        function generateRandomPosition(elementWidth, elementHeight) {
-            const minX = circleArea.offsetLeft;
-            const maxX = circleArea.offsetLeft + circleArea.offsetWidth - elementWidth;
-            const minY = circleArea.offsetTop;
-            const maxY = circleArea.offsetTop + circleArea.offsetHeight - elementHeight;
-            const x = Math.random() * (maxX - minX) + minX;
-            const y = Math.random() * (maxY - minY) + minY;
-            return { x, y };
-        }
-
-        hostButton.addEventListener('click', () => {
-            inputContainer.style.display = 'flex';
-        });
-
-        submitButton.addEventListener('click', () => {
-            const userId = document.getElementById('userId').value;
-            const textContent = document.getElementById('textContent').value.substring(0, 10); // 최대 10글자 제한
-            const phoneNumber = document.getElementById('phoneNumber').value;
-
-            // 전화번호 포맷 검사
-            const phoneRegex = /^\d{3}-\d{3}-\d{4}$/;
-            if (!phoneRegex.test(phoneNumber)) {
-                alert('전화번호 형식을 XXX-XXX-XXXX로 입력해주세요.');
-                return;
-            }
-
-            inputContainer.style.display = 'none';
-
-            const circleDiv = document.createElement('div');
-            circleDiv.classList.add('circle');
-            circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
-
-            let position;
-            let collision = true;
-            let maxAttempts = 100; // 겹침 방지 시도 횟수 제한
-
-            for (let i = 0; i < maxAttempts && collision; i++) {
-                const randomPosition = generateRandomPosition(100, 80); // 초기 크기 추정
-                circleDiv.style.left = `${randomPosition.x}px`;
-                circleDiv.style.top = `${randomPosition.y}px`;
-                collision = isColliding({
-                    x: randomPosition.x + (circleDiv.offsetWidth / 2 || 50), // 초기 추정 또는 실제 너비
-                    y: randomPosition.y + (circleDiv.offsetHeight / 2 || 40), // 초기 추정 또는 실제 높이
-                    offsetWidth: circleDiv.offsetWidth || 100,
-                    offsetHeight: circleDiv.offsetHeight || 80
-                });
-                if (!collision) {
-                    position = randomPosition;
-                }
-            }
-
-            if (position) {
-                circleDiv.style.left = `${position.x - circleArea.offsetLeft}px`;
-                circleDiv.style.top = `${position.y - circleArea.offsetTop}px`;
-
-                const joinButton = document.createElement('button');
-                joinButton.classList.add('join-button');
-                joinButton.textContent = 'JOIN';
-                circleDiv.appendChild(joinButton);
-
-                circleDiv.addEventListener('click', () => {
-                    circleDiv.classList.toggle('selected');
-                    joinButton.style.display = circleDiv.classList.contains('selected') ? 'block' : 'none';
-                });
-
-                circleArea.appendChild(circleDiv);
-                circles.push(circleDiv); // 생성된 circleDiv를 배열에 저장
-
-                // 5분 뒤에 사라지도록 설정
-                setTimeout(() => {
-                    circleDiv.remove();
-                    const index = circles.indexOf(circleDiv);
-                    if (index > -1) {
-                        circles.splice(index, 1);
-                    }
-                }, 5 * 60 * 1000);
-            } else {
-                alert('더 이상 겹치지 않는 위치를 찾을 수 없습니다.');
-            }
-
-            // 입력 필드 초기화
-            document.getElementById('userId').value = '';
-            document.getElementById('textContent').value = '';
-            document.getElementById('phoneNumber').value = '';
-        });
-    </script>
 </body>
 </html>
