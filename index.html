@@ -38,7 +38,6 @@
             margin-right: 10px;
         }
         .join-button {
-            display: none;
             margin-top: 5px;
             padding: 5px 10px;
             background-color: #4CAF50;
@@ -47,6 +46,9 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.9em;
+        }
+        .joined-button {
+            background-color: #008CBA; /* Joined 상태의 다른 색상 */
         }
         .selected {
             border: 2px solid red;
@@ -67,7 +69,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
 
         // Your web app's Firebase configuration
         const firebaseConfig = {
@@ -86,6 +88,7 @@
         const circleArea = document.getElementById('circleArea');
         const circles = []; // 생성된 동그라미들을 저장할 배열
         const circleMinDistance = 100; // 최소 간격
+        const currentUserId = 'user-' + Math.random().toString(36).substring(2, 12); // 임시 사용자 ID (실제 앱에서는 인증 시스템 사용)
 
         document.addEventListener('DOMContentLoaded', () => {
             const hostButton = document.getElementById('hostButton');
@@ -135,7 +138,7 @@
                     }
 
                     if (position) {
-                        // Firestore에 데이터 추가
+                        // Firestore에 데이터 추가 (joinedUsers 필드 초기화)
                         addDoc(collection(db, "circles"), {
                             userId: userId,
                             textContent: textContent,
@@ -144,7 +147,8 @@
                                 left: position.x - circleArea.offsetLeft,
                                 top: position.y - circleArea.offsetTop
                             },
-                            createdAt: serverTimestamp()
+                            createdAt: serverTimestamp(),
+                            joinedUsers: [] // 초기 joinedUsers 배열
                         })
                         .then((docRef) => {
                             console.log("Document written with ID: ", docRef.id);
@@ -217,9 +221,23 @@
             joinButton.textContent = 'JOIN';
             circleDiv.appendChild(joinButton);
 
+            joinButton.addEventListener('click', (event) => {
+                event.stopPropagation(); // 동그라미 클릭 이벤트 방지
+                const docId = circleDiv.dataset.docId;
+                const circleDocRef = doc(db, "circles", docId);
+
+                updateDoc(circleDocRef, {
+                    joinedUsers: arrayUnion(currentUserId)
+                }).then(() => {
+                    console.log("User joined circle with ID: ", docId);
+                }).catch((error) => {
+                    console.error("Error joining circle: ", error);
+                });
+            });
+
             circleDiv.addEventListener('click', () => {
                 circleDiv.classList.toggle('selected');
-                joinButton.style.display = circleDiv.classList.contains('selected') ? 'block' : 'none';
+                // 로컬 UI 업데이트는 제거. Firestore 상태 변경에 따라 onSnapshot에서 처리
             });
 
             circleArea.appendChild(circleDiv);
@@ -229,12 +247,30 @@
         // 페이지 로드 시 Firestore 데이터 불러오기 및 실시간 감시
         onSnapshot(collection(db, "circles"), (snapshot) => {
             snapshot.docChanges().forEach((change) => {
+                const data = change.doc.data();
+                const docId = change.doc.id;
+                const existingCircleInfo = circles.find(c => c.id === docId);
+
                 if (change.type === "added") {
-                    const data = change.doc.data();
-                    createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, change.doc.id);
+                    createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, docId);
+                }
+                if (change.type === "modified") {
+                    if (existingCircleInfo && existingCircleInfo.element) {
+                        const circleDiv = existingCircleInfo.element;
+                        const joinButton = circleDiv.querySelector('.join-button');
+                        const joinedUsers = data.joinedUsers || [];
+
+                        if (joinedUsers.includes(currentUserId)) {
+                            joinButton.textContent = 'JOINED';
+                            joinButton.classList.add('joined-button');
+                        } else {
+                            joinButton.textContent = 'JOIN';
+                            joinButton.classList.remove('joined-button');
+                        }
+                    }
                 }
                 if (change.type === "removed") {
-                    const removedCircle = circles.find(c => c.id === change.doc.id);
+                    const removedCircle = circles.find(c => c.id === docId);
                     if (removedCircle) {
                         removedCircle.element.remove();
                         const index = circles.indexOf(removedCircle);
@@ -243,7 +279,6 @@
                         }
                     }
                 }
-                // "modified" 이벤트는 필요에 따라 처리
             });
         });
 
