@@ -65,7 +65,7 @@
         <button id="submitButton">생성</button>
     </div>
     <div id="circleArea">
-        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
@@ -114,10 +114,6 @@
 
                     inputContainer.style.display = 'none';
 
-                    const circleDiv = document.createElement('div');
-                    circleDiv.classList.add('circle');
-                    circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
-
                     let position;
                     let collision = true;
                     let maxAttempts = 100; // 겹침 방지 시도 횟수 제한
@@ -152,7 +148,7 @@
                         })
                         .then((docRef) => {
                             console.log("Document written with ID: ", docRef.id);
-                            createCircleElement(userId, textContent, phoneNumber, position.x - circleArea.offsetLeft, position.y - circleArea.offsetTop, docRef.id);
+                            createCircleElement(userId, textContent, phoneNumber, position.x - circleArea.offsetLeft, position.y - circleArea.offsetTop, docRef.id, []); // 초기 joinedUsers 전달
 
                             // 5분 뒤에 사라지도록 설정 (Firestore에서도 삭제)
                             setTimeout(() => {
@@ -208,7 +204,17 @@
             return { x, y };
         }
 
-        function createCircleElement(userId, textContent, phoneNumber, left, top, docId) {
+        function updateJoinButtonUI(button, isJoined) {
+            if (isJoined) {
+                button.textContent = 'JOINED';
+                button.classList.add('joined-button');
+            } else {
+                button.textContent = 'JOIN';
+                button.classList.remove('joined-button');
+            }
+        }
+
+        function createCircleElement(userId, textContent, phoneNumber, left, top, docId, initialJoinedUsers) {
             const circleDiv = document.createElement('div');
             circleDiv.classList.add('circle');
             circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
@@ -218,21 +224,26 @@
 
             const joinButton = document.createElement('button');
             joinButton.classList.add('join-button');
-            joinButton.textContent = 'JOIN';
+            updateJoinButtonUI(joinButton, initialJoinedUsers.includes(currentUserId)); // 초기 상태 설정
             circleDiv.appendChild(joinButton);
 
             joinButton.addEventListener('click', (event) => {
                 event.stopPropagation(); // 동그라미 클릭 이벤트 방지
                 const docId = circleDiv.dataset.docId;
                 const circleDocRef = doc(db, "circles", docId);
+                const isCurrentlyJoined = joinButton.classList.contains('joined-button');
 
                 updateDoc(circleDocRef, {
-                    joinedUsers: arrayUnion(currentUserId)
+                    joinedUsers: isCurrentlyJoined ? arrayRemove(currentUserId) : arrayUnion(currentUserId)
                 }).then(() => {
-                    console.log("User joined circle with ID: ", docId);
+                    console.log("User joined/left circle with ID: ", docId);
+                    // 로컬 UI는 onSnapshot에서 업데이트
                 }).catch((error) => {
-                    console.error("Error joining circle: ", error);
+                    console.error("Error joining/leaving circle: ", error);
                 });
+
+                // 클릭한 클라이언트의 UI 즉시 업데이트
+                updateJoinButtonUI(joinButton, !isCurrentlyJoined);
             });
 
             circleDiv.addEventListener('click', () => {
@@ -252,21 +263,14 @@
                 const existingCircleInfo = circles.find(c => c.id === docId);
 
                 if (change.type === "added") {
-                    createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, docId);
+                    createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, docId, data.joinedUsers || []);
                 }
                 if (change.type === "modified") {
                     if (existingCircleInfo && existingCircleInfo.element) {
                         const circleDiv = existingCircleInfo.element;
                         const joinButton = circleDiv.querySelector('.join-button');
                         const joinedUsers = data.joinedUsers || [];
-
-                        if (joinedUsers.includes(currentUserId)) {
-                            joinButton.textContent = 'JOINED';
-                            joinButton.classList.add('joined-button');
-                        } else {
-                            joinButton.textContent = 'JOIN';
-                            joinButton.classList.remove('joined-button');
-                        }
+                        updateJoinButtonUI(joinButton, joinedUsers.includes(currentUserId));
                     }
                 }
                 if (change.type === "removed") {
@@ -281,18 +285,6 @@
                 }
             });
         });
-
-        // 초기 로딩 시 기존 데이터 불러오기 (onSnapshot에서 added 이벤트로 처리되므로 중복 방지)
-        // getDocs(collection(db, "circles"))
-        //     .then((querySnapshot) => {
-        //         querySnapshot.forEach((doc) => {
-        //             const data = doc.data();
-        //             createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, doc.id);
-        //         });
-        //     })
-        //     .catch((error) => {
-        //         console.error("Error getting documents: ", error);
-        //     });
     </script>
 
 </body>
