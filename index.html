@@ -1,291 +1,208 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>동그라미 생성 및 관리</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOF2 LOBBY</title>
     <style>
-        #circleArea {
-            position: relative;
-            width: 500px;
-            height: 400px;
-            border: 1px solid black;
-        }
-        .circle {
-            position: absolute;
-            width: 100px;
-            height: 80px;
-            border-radius: 10px;
-            background-color: lightblue;
+        body {
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            overflow: hidden; /* 물방울이 튀어나가지 않도록 숨김 */
+        }
+
+        .centered-box {
+            width: 80vw;
+            height: 80vh;
+            border: 2px solid #333;
+            padding: 20px;
             text-align: center;
+            background-color: #fff;
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+            position: relative; /* 물방울 위치 지정을 위해 필요 */
+            overflow: hidden; /* 물방울이 상자 밖으로 나가지 않도록 숨김 */
+        }
+
+        .bubble-button {
+            padding: 10px 20px;
+            font-size: 16px;
             cursor: pointer;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            margin-top: 20px;
         }
-        .circle div {
-            margin: 2px 0;
-            font-size: 0.8em;
+
+        .bubble {
+            position: absolute;
+            background-color: rgba(173, 216, 230, 0.7); /* 연한 파란색, 투명도 70% */
+            border-radius: 50%; /* 원형 */
+            opacity: 0; /* 초기에는 투명하게 설정하여 fadeIn 애니메이션으로 나타나게 함 */
+            transform: scale(0.2); /* 초기 크기를 작게 설정하여 fadeIn 애니메이션으로 커지게 함 */
+            display: flex; /* 텍스트를 중앙에 배치하기 위해 flexbox 사용 */
+            justify-content: center;
+            align-items: center;
+            font-size: 16px; /* 카운트다운 텍스트 크기 (물방울 크기 조정에 따라 수정) */
+            color: #333; /* 카운트다운 텍스트 색상 */
+            font-weight: bold;
+            transition: opacity 0.5s, transform 0.5s; /* 부드러운 전환 효과 추가 */
         }
-        #inputContainer {
-            display: none;
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            background-color: #f9f9f9;
+
+        /* 물방울 생성 시 나타나는 애니메이션 */
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.2);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
-        #inputContainer input {
-            margin-right: 10px;
-        }
-        .join-button {
-            margin-top: 5px;
-            padding: 5px 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-        .joined-button {
-            background-color: #008CBA; /* Joined 상태의 다른 색상 */
-        }
-        .selected {
-            border: 2px solid red;
+
+        /* 물방울 사라질 때의 애니메이션 */
+        @keyframes fadeOut {
+            0% {
+                opacity: 1; /* 애니메이션 시작 시에는 보임 */
+                transform: scale(1); /* 애니메이션 시작 시 크기 */
+            }
+            100% {
+                opacity: 0; /* 완전히 사라짐 */
+                transform: scale(0.5); /* 사라지면서 살짝 작아짐 */
+            }
         }
     </style>
 </head>
 <body>
-
-    <button id="hostButton">새로운 동그라미 호스트</button>
-    <div id="inputContainer">
-        <input type="text" id="userId" placeholder="ID">
-        <input type="text" id="textContent" placeholder="내용 (최대 10자)">
-        <input type="text" id="phoneNumber" placeholder="전화번호 (XXX-XXX-XXXX)">
-        <button id="submitButton">생성</button>
-    </div>
-    <div id="circleArea">
+    <div class="centered-box">
+        <h1>환영합니다!</h1>
+        <p>이곳에 원하는 내용을 추가하세요.</p>
+        <button class="bubble-button">물방울 생성</button>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+    <script>
+        const activeBubbles = []; // 현재 활성화된 물방울들을 저장할 배열
 
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBpbl_aQO5DskYnR2MSq6k-zjAFXI-dvps",
-            authDomain: "project-e600e.firebaseapp.com",
-            projectId: "project-e600e",
-            storageBucket: "project-e600e.firebasestorage.app",
-            messagingSenderId: "75806384501",
-            appId: "1:75806384501:web:67e6cce23bdff9e926b33c"
-        };
+        document.querySelector('.bubble-button').addEventListener('click', function() {
+            const centeredBox = document.querySelector('.centered-box');
+            const boxRect = centeredBox.getBoundingClientRect();
+            const boxPadding = 20; // centered-box의 padding 값
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app); // Firestore 인스턴스 가져오기
+            // 물방울 크기 (기존 500px의 1/5 = 100px)
+            const size = 100;
 
-        const circleArea = document.getElementById('circleArea');
-        const circles = []; // 생성된 동그라미들을 저장할 배열
-        const circleMinDistance = 100; // 최소 간격
-        const currentUserId = 'user-' + Math.random().toString(36).substring(2, 12); // 임시 사용자 ID (실제 앱에서는 인증 시스템 사용)
+            // 물방울 생성
+            const bubble = document.createElement('div');
+            bubble.classList.add('bubble');
+            bubble.style.width = `${size}px`;
+            bubble.style.height = `${size}px`;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const hostButton = document.getElementById('hostButton');
-            const inputContainer = document.getElementById('inputContainer');
-            const submitButton = document.getElementById('submitButton');
+            let startX, startY;
+            let foundPosition = false;
+            let attempts = 0;
+            const maxAttempts = 100; // 최대 시도 횟수
 
-            if (hostButton && inputContainer && submitButton && circleArea) {
-                hostButton.addEventListener('click', () => {
-                    inputContainer.style.display = 'flex';
-                });
+            // 물방울 시작 위치 (centered-box 패딩 내부에서 랜덤하게 배치)
+            // 겹치지 않는 위치를 찾을 때까지 반복
+            while (!foundPosition && attempts < maxAttempts) {
+                const maxX = centeredBox.offsetWidth - size - 2 * boxPadding;
+                const maxY = centeredBox.offsetHeight - size - 2 * boxPadding;
+                startX = Math.random() * maxX + boxPadding;
+                startY = Math.random() * maxY + boxPadding;
 
-                submitButton.addEventListener('click', () => {
-                    const userId = document.getElementById('userId').value;
-                    const textContent = document.getElementById('textContent').value.substring(0, 10); // 최대 10글자 제한
-                    const phoneNumber = document.getElementById('phoneNumber').value;
+                let overlapping = false;
+                for (const existingBubble of activeBubbles) {
+                    const existingRect = existingBubble.getBoundingClientRect();
+                    // centered-box 기준 상대 위치로 변환
+                    const existingLeft = existingRect.left - boxRect.left;
+                    const existingTop = existingRect.top - boxRect.top;
 
-                    // 전화번호 포맷 검사
-                    const phoneRegex = /^\d{3}-\d{3}-\d{4}$/;
-                    if (!phoneRegex.test(phoneNumber)) {
-                        alert('전화번호 형식을 XXX-XXX-XXXX로 입력해주세요.');
-                        return;
+                    // 두 원의 중심 간 거리 계산
+                    const distanceX = (startX + size / 2) - (existingLeft + existingBubble.offsetWidth / 2);
+                    const distanceY = (startY + size / 2) - (existingTop + existingBubble.offsetHeight / 2);
+                    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+                    // 두 원의 반지름 합
+                    const minDistance = (size / 2) + (existingBubble.offsetWidth / 2);
+
+                    if (distance < minDistance) {
+                        overlapping = true;
+                        break;
                     }
+                }
 
-                    inputContainer.style.display = 'none';
-
-                    let position;
-                    let collision = true;
-                    let maxAttempts = 100; // 겹침 방지 시도 횟수 제한
-
-                    for (let i = 0; i < maxAttempts && collision; i++) {
-                        const randomPosition = generateRandomPosition(100, 80); // 초기 크기 추정
-                        circleDiv.style.left = `${randomPosition.x}px`;
-                        circleDiv.style.top = `${randomPosition.y}px`;
-                        collision = isColliding({
-                            x: randomPosition.x + (circleDiv.offsetWidth / 2 || 50), // 초기 추정 또는 실제 너비
-                            y: randomPosition.y + (circleDiv.offsetHeight / 2 || 40), // 초기 추정 또는 실제 높이
-                            offsetWidth: circleDiv.offsetWidth || 100,
-                            offsetHeight: circleDiv.offsetHeight || 80
-                        });
-                        if (!collision) {
-                            position = randomPosition;
-                        }
-                    }
-
-                    if (position) {
-                        // Firestore에 데이터 추가 (joinedUsers 필드 초기화)
-                        addDoc(collection(db, "circles"), {
-                            userId: userId,
-                            textContent: textContent,
-                            phoneNumber: phoneNumber,
-                            position: {
-                                left: position.x - circleArea.offsetLeft,
-                                top: position.y - circleArea.offsetTop
-                            },
-                            createdAt: serverTimestamp(),
-                            joinedUsers: [] // 초기 joinedUsers 배열
-                        })
-                        .then((docRef) => {
-                            console.log("Document written with ID: ", docRef.id);
-                            createCircleElement(userId, textContent, phoneNumber, position.x - circleArea.offsetLeft, position.y - circleArea.offsetTop, docRef.id, []); // 초기 joinedUsers 전달
-
-                            // 5분 뒤에 사라지도록 설정 (Firestore에서도 삭제)
-                            setTimeout(() => {
-                                const circleToRemove = circles.find(c => c.id === docRef.id);
-                                if (circleToRemove) {
-                                    circleToRemove.element.remove();
-                                    const index = circles.indexOf(circleToRemove);
-                                    if (index > -1) {
-                                        circles.splice(index, 1);
-                                    }
-                                    deleteDoc(doc(db, "circles", docRef.id));
-                                    console.log("Document with ID ", docRef.id, " deleted after 5 minutes.");
-                                }
-                            }, 5 * 60 * 1000);
-                        })
-                        .catch((error) => {
-                            console.error("Error adding document: ", error);
-                        });
-                    } else {
-                        alert('더 이상 겹치지 않는 위치를 찾을 수 없습니다.');
-                    }
-
-                    // 입력 필드 초기화
-                    document.getElementById('userId').value = '';
-                    document.getElementById('textContent').value = '';
-                    document.getElementById('phoneNumber').value = '';
-                });
-            } else {
-                console.error("필수 HTML 요소가 존재하지 않습니다.");
+                if (!overlapping) {
+                    foundPosition = true;
+                }
+                attempts++;
             }
-        });
 
-        function isColliding(newCircle) {
-            for (const existingCircle of circles) {
-                const dx = newCircle.x - existingCircle.x;
-                const dy = newCircle.y - existingCircle.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const minDistance = (newCircle.offsetWidth / 2) + (existingCircle.offsetWidth / 2) + circleMinDistance;
-                if (distance < minDistance) {
-                    return true;
-                }
+            if (!foundPosition) {
+                console.warn("겹치지 않는 위치를 찾지 못했습니다. 물방울 생성을 중단합니다.");
+                return; // 겹치지 않는 위치를 찾지 못하면 생성 중단
             }
-            return false;
-        }
 
-        function generateRandomPosition(elementWidth, elementHeight) {
-            const minX = circleArea.offsetLeft;
-            const maxX = circleArea.offsetLeft + circleArea.offsetWidth - elementWidth;
-            const minY = circleArea.offsetTop;
-            const maxY = circleArea.offsetTop + circleArea.offsetHeight - elementHeight;
-            const x = Math.random() * (maxX - minX) + minX;
-            const y = Math.random() * (maxY - minY) + minY;
-            return { x, y };
-        }
+            bubble.style.left = `${startX}px`;
+            bubble.style.top = `${startY}px`;
 
-        function updateJoinButtonUI(button, isJoined) {
-            if (isJoined) {
-                button.textContent = 'JOINED';
-                button.classList.add('joined-button');
-            } else {
-                button.textContent = 'JOIN';
-                button.classList.remove('joined-button');
-            }
-        }
+            // 카운트다운 텍스트 요소 추가
+            const countdownText = document.createElement('span');
+            bubble.appendChild(countdownText);
 
-        function createCircleElement(userId, textContent, phoneNumber, left, top, docId, initialJoinedUsers) {
-            const circleDiv = document.createElement('div');
-            circleDiv.classList.add('circle');
-            circleDiv.innerHTML = `<div>ID: ${userId}</div><div>${textContent}</div><div>${phoneNumber}</div>`;
-            circleDiv.style.left = `${left}px`;
-            circleDiv.style.top = `${top}px`;
-            circleDiv.dataset.docId = docId; // 문서 ID를 data 속성에 저장
+            centeredBox.appendChild(bubble);
+            activeBubbles.push(bubble); // 생성된 물방울을 배열에 추가
 
-            const joinButton = document.createElement('button');
-            joinButton.classList.add('join-button');
-            updateJoinButtonUI(joinButton, initialJoinedUsers.includes(currentUserId)); // 초기 상태 설정
-            circleDiv.appendChild(joinButton);
+            // 1. 생성 애니메이션 즉시 시작
+            bubble.style.animation = 'fadeInScale 0.5s forwards';
 
-            joinButton.addEventListener('click', (event) => {
-                event.stopPropagation(); // 동그라미 클릭 이벤트 방지
-                const docId = circleDiv.dataset.docId;
-                const circleDocRef = doc(db, "circles", docId);
-                const isCurrentlyJoined = joinButton.classList.contains('joined-button');
+            const totalLifeTime = 5 * 60 * 1000; // 5분 (300초)
+            const fadeOutDuration = 5 * 1000; // 사라지는 애니메이션 시간 (5초)
 
-                updateDoc(circleDocRef, {
-                    joinedUsers: isCurrentlyJoined ? arrayRemove(currentUserId) : arrayUnion(currentUserId)
-                }).then(() => {
-                    console.log("User joined/left circle with ID: ", docId);
-                    // 로컬 UI는 onSnapshot에서 업데이트
-                }).catch((error) => {
-                    console.error("Error joining/leaving circle: ", error);
-                });
+            // 2. 사라지는 애니메이션 시작 시간 계산
+            const fadeOutStartTime = totalLifeTime - fadeOutDuration;
 
-                // 클릭한 클라이언트의 UI 즉시 업데이트
-                updateJoinButtonUI(joinButton, !isCurrentlyJoined);
-            });
+            let remainingTime = totalLifeTime;
 
-            circleDiv.addEventListener('click', () => {
-                circleDiv.classList.toggle('selected');
-                // 로컬 UI 업데이트는 제거. Firestore 상태 변경에 따라 onSnapshot에서 처리
-            });
+            // 카운트다운 업데이트 함수
+            const updateCountdown = () => {
+                const minutes = Math.floor(remainingTime / (60 * 1000));
+                const seconds = Math.floor((remainingTime % (60 * 1000)) / 1000);
+                countdownText.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                remainingTime -= 1000; // 1초 감소
 
-            circleArea.appendChild(circleDiv);
-            circles.push({ element: circleDiv, id: docId });
-        }
-
-        // 페이지 로드 시 Firestore 데이터 불러오기 및 실시간 감시
-        onSnapshot(collection(db, "circles"), (snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                const data = change.doc.data();
-                const docId = change.doc.id;
-                const existingCircleInfo = circles.find(c => c.id === docId);
-
-                if (change.type === "added") {
-                    createCircleElement(data.userId, data.textContent, data.phoneNumber, data.position.left, data.position.top, docId, data.joinedUsers || []);
+                if (remainingTime < 0) {
+                    clearInterval(countdownInterval);
                 }
-                if (change.type === "modified") {
-                    if (existingCircleInfo && existingCircleInfo.element) {
-                        const circleDiv = existingCircleInfo.element;
-                        const joinButton = circleDiv.querySelector('.join-button');
-                        const joinedUsers = data.joinedUsers || [];
-                        updateJoinButtonUI(joinButton, joinedUsers.includes(currentUserId));
+            };
+
+            // 초기 카운트다운 표시
+            updateCountdown();
+
+            // 1초마다 카운트다운 업데이트
+            const countdownInterval = setInterval(updateCountdown, 1000);
+
+            // 3. 사라지는 애니메이션 시작 타이머
+            setTimeout(() => {
+                if (bubble.parentNode) {
+                    bubble.style.animation = `fadeOut ${fadeOutDuration / 1000}s forwards`;
+                    clearInterval(countdownInterval); // 카운트다운 멈춤
+                }
+            }, fadeOutStartTime);
+
+            // 4. 물방울 최종 제거 타이머 (사라지는 애니메이션이 끝난 후)
+            setTimeout(() => {
+                if (bubble.parentNode) {
+                    bubble.remove();
+                    // 배열에서도 제거
+                    const index = activeBubbles.indexOf(bubble);
+                    if (index > -1) {
+                        activeBubbles.splice(index, 1);
                     }
                 }
-                if (change.type === "removed") {
-                    const removedCircle = circles.find(c => c.id === docId);
-                    if (removedCircle) {
-                        removedCircle.element.remove();
-                        const index = circles.indexOf(removedCircle);
-                        if (index > -1) {
-                            circles.splice(index, 1);
-                        }
-                    }
-                }
-            });
+            }, totalLifeTime);
         });
     </script>
-
 </body>
 </html>
