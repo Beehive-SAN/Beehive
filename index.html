@@ -12,7 +12,7 @@
             min-height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
-            overflow: hidden; /* 물방울이 튀어나가지 않도록 숨김 */
+            overflow: hidden;
         }
 
         .centered-box {
@@ -24,8 +24,8 @@
             background-color: #fff;
             box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.2);
             box-sizing: border-box;
-            position: relative; /* 물방울 위치 지정을 위해 필요 */
-            overflow: hidden; /* 물방울이 상자 밖으로 나가지 않도록 숨김 */
+            position: relative;
+            overflow: hidden;
         }
 
         .bubble-button {
@@ -37,20 +37,20 @@
 
         .bubble {
             position: absolute;
-            background-color: rgba(173, 216, 230, 0.7); /* 연한 파란색, 투명도 70% */
-            border-radius: 50%; /* 원형 */
-            opacity: 0; /* 초기에는 투명하게 설정하여 fadeIn 애니메이션으로 나타나게 함 */
-            transform: scale(0.2); /* 초기 크기를 작게 설정하여 fadeIn 애니메이션으로 커지게 함 */
-            display: flex; /* 텍스트를 중앙에 배치하기 위해 flexbox 사용 */
+            background-color: rgba(173, 216, 230, 0.7);
+            border-radius: 50%;
+            opacity: 0;
+            transform: scale(0.2);
+            display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 16px; /* 카운트다운 텍스트 크기 (물방울 크기 조정에 따라 수정) */
-            color: #333; /* 카운트다운 텍스트 색상 */
+            font-size: 16px;
+            color: #333;
             font-weight: bold;
-            transition: opacity 0.5s, transform 0.5s; /* 부드러운 전환 효과 추가 */
+            /* transform을 제거하여 불필요한 전환 방지. fadeInScale, fadeOut 애니메이션에서 transform 처리 */
+            transition: opacity 0.5s; 
         }
 
-        /* 물방울 생성 시 나타나는 애니메이션 */
         @keyframes fadeInScale {
             0% {
                 opacity: 0;
@@ -62,15 +62,15 @@
             }
         }
 
-        /* 물방울 사라질 때의 애니메이션 */
         @keyframes fadeOut {
             0% {
-                opacity: 1; /* 애니메이션 시작 시에는 보임 */
-                transform: scale(1); /* 애니메이션 시작 시 크기 */
+                opacity: 1;
+                transform: scale(1);
             }
             100% {
-                opacity: 0; /* 완전히 사라짐 */
-                transform: scale(0.5); /* 사라지면서 살짝 작아짐 */
+                opacity: 0;
+                /* transform: scale(0.5); 제거. 물방울이 사라질 때 크기가 줄어드는 효과를 원하면 다시 추가 */
+                transform: scale(0.5); /* 0.5로 줄어들면서 사라지는 효과를 유지하려면 이 줄을 유지합니다. */
             }
         }
     </style>
@@ -81,49 +81,45 @@
     </div>
 
     <script>
-        const activeBubbles = []; // 현재 활성화된 물방울들을 저장할 배열
+        // 상수 정의 (가독성 및 유지보수성 향상)
+        const BUBBLE_SIZE = 100; // 물방울 크기 (px)
+        const TOTAL_LIFETIME_MS = 5 * 60 * 1000; // 물방울 총 생명 주기 (5분)
+        const FADE_OUT_DURATION_MS = 5 * 1000; // 물방울 사라지는 시간 (5초)
+        const MAX_PLACEMENT_ATTEMPTS = 100; // 물방울 배치 시도 최대 횟수
+        const BOX_PADDING = 20; // centered-box의 padding 값 (px)
+
+        const activeBubbles = []; // 현재 활성화된 물방울들을 저장하는 배열
 
         document.querySelector('.bubble-button').addEventListener('click', function() {
             const centeredBox = document.querySelector('.centered-box');
-            const boxRect = centeredBox.getBoundingClientRect();
-            const boxPadding = 20; // centered-box의 padding 값
-
-            // 물방울 크기 (기존 500px의 1/5 = 100px)
-            const size = 100;
-
-            // 물방울 생성
-            const bubble = document.createElement('div');
-            bubble.classList.add('bubble');
-            bubble.style.width = `${size}px`;
-            bubble.style.height = `${size}px`;
+            
+            // 물방울이 배치될 수 있는 최대 x, y 좌표 (패딩 고려)
+            const maxX = centeredBox.offsetWidth - BUBBLE_SIZE - 2 * BOX_PADDING;
+            const maxY = centeredBox.offsetHeight - BUBBLE_SIZE - 2 * BOX_PADDING;
 
             let startX, startY;
             let foundPosition = false;
             let attempts = 0;
-            const maxAttempts = 100; // 최대 시도 횟수
 
-            // 물방울 시작 위치 (centered-box 패딩 내부에서 랜덤하게 배치)
-            // 겹치지 않는 위치를 찾을 때까지 반복
-            while (!foundPosition && attempts < maxAttempts) {
-                const maxX = centeredBox.offsetWidth - size - 2 * boxPadding;
-                const maxY = centeredBox.offsetHeight - size - 2 * boxPadding;
-                startX = Math.random() * maxX + boxPadding;
-                startY = Math.random() * maxY + boxPadding;
+            // 물방울이 겹치지 않는 위치를 찾을 때까지 반복
+            while (!foundPosition && attempts < MAX_PLACEMENT_ATTEMPTS) {
+                // 랜덤 위치 계산
+                startX = Math.random() * maxX + BOX_PADDING;
+                startY = Math.random() * maxY + BOX_PADDING;
 
                 let overlapping = false;
                 for (const existingBubble of activeBubbles) {
-                    const existingRect = existingBubble.getBoundingClientRect();
-                    // centered-box 기준 상대 위치로 변환
-                    const existingLeft = existingRect.left - boxRect.left;
-                    const existingTop = existingRect.top - boxRect.top;
+                    // 기존 물방울의 현재 위치 가져오기 (relative to centeredBox)
+                    const existingLeft = parseFloat(existingBubble.style.left);
+                    const existingTop = parseFloat(existingBubble.style.top);
 
-                    // 두 원의 중심 간 거리 계산
-                    const distanceX = (startX + size / 2) - (existingLeft + existingBubble.offsetWidth / 2);
-                    const distanceY = (startY + size / 2) - (existingTop + existingBubble.offsetHeight / 2);
+                    // 두 물방울 중심점 간의 거리 계산
+                    const distanceX = (startX + BUBBLE_SIZE / 2) - (existingLeft + BUBBLE_SIZE / 2);
+                    const distanceY = (startY + BUBBLE_SIZE / 2) - (existingTop + BUBBLE_SIZE / 2);
                     const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
-                    // 두 원의 반지름 합
-                    const minDistance = (size / 2) + (existingBubble.offsetWidth / 2);
+                    // 두 물방울이 겹치지 않기 위한 최소 거리 (두 반지름의 합)
+                    const minDistance = BUBBLE_SIZE; // (BUBBLE_SIZE / 2) + (BUBBLE_SIZE / 2)
 
                     if (distance < minDistance) {
                         overlapping = true;
@@ -137,69 +133,65 @@
                 attempts++;
             }
 
+            // 적절한 위치를 찾지 못했으면 물방울 생성 중단
             if (!foundPosition) {
                 console.warn("겹치지 않는 위치를 찾지 못했습니다. 물방울 생성을 중단합니다.");
-                return; // 겹치지 않는 위치를 찾지 못하면 생성 중단
+                return;
             }
 
+            const bubble = document.createElement('div');
+            bubble.classList.add('bubble');
+            bubble.style.width = `${BUBBLE_SIZE}px`;
+            bubble.style.height = `${BUBBLE_SIZE}px`;
             bubble.style.left = `${startX}px`;
             bubble.style.top = `${startY}px`;
 
-            // 카운트다운 텍스트 요소 추가
             const countdownText = document.createElement('span');
             bubble.appendChild(countdownText);
 
             centeredBox.appendChild(bubble);
             activeBubbles.push(bubble); // 생성된 물방울을 배열에 추가
 
-            // 1. 생성 애니메이션 즉시 시작
+            // 물방울 나타나는 애니메이션 적용
             bubble.style.animation = 'fadeInScale 0.5s forwards';
 
-            const totalLifeTime = 5 * 60 * 1000; // 5분 (300초)
-            const fadeOutDuration = 5 * 1000; // 사라지는 애니메이션 시간 (5초)
+            const fadeOutStartTime = TOTAL_LIFETIME_MS - FADE_OUT_DURATION_MS;
+            let remainingTime = TOTAL_LIFETIME_MS;
 
-            // 2. 사라지는 애니메이션 시작 시간 계산
-            const fadeOutStartTime = totalLifeTime - fadeOutDuration;
-
-            let remainingTime = totalLifeTime;
-
-            // 카운트다운 업데이트 함수
             const updateCountdown = () => {
                 const minutes = Math.floor(remainingTime / (60 * 1000));
                 const seconds = Math.floor((remainingTime % (60 * 1000)) / 1000);
                 countdownText.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                remainingTime -= 1000; // 1초 감소
+                remainingTime -= 1000;
 
                 if (remainingTime < 0) {
                     clearInterval(countdownInterval);
                 }
             };
 
-            // 초기 카운트다운 표시
-            updateCountdown();
-
-            // 1초마다 카운트다운 업데이트
+            updateCountdown(); // 초기 카운트다운 표시
             const countdownInterval = setInterval(updateCountdown, 1000);
 
-            // 3. 사라지는 애니메이션 시작 타이머
+            // 물방울 사라지는 애니메이션 시작 시점
             setTimeout(() => {
+                // 물방울이 아직 DOM에 있다면 애니메이션 적용
                 if (bubble.parentNode) {
-                    bubble.style.animation = `fadeOut ${fadeOutDuration / 1000}s forwards`;
-                    clearInterval(countdownInterval); // 카운트다운 멈춤
+                    bubble.style.animation = `fadeOut ${FADE_OUT_DURATION_MS / 1000}s forwards`;
+                    clearInterval(countdownInterval); // 카운트다운 중지
                 }
             }, fadeOutStartTime);
 
-            // 4. 물방울 최종 제거 타이머 (사라지는 애니메이션이 끝난 후)
+            // 물방울 완전히 제거
             setTimeout(() => {
                 if (bubble.parentNode) {
-                    bubble.remove();
-                    // 배열에서도 제거
+                    bubble.remove(); // DOM에서 물방울 제거
+                    // activeBubbles 배열에서 물방울 제거
                     const index = activeBubbles.indexOf(bubble);
                     if (index > -1) {
                         activeBubbles.splice(index, 1);
                     }
                 }
-            }, totalLifeTime);
+            }, TOTAL_LIFETIME_MS);
         });
     </script>
 </body>
