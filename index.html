@@ -47,8 +47,8 @@
             font-size: 16px;
             color: #333;
             font-weight: bold;
-            /* transform을 제거하여 불필요한 전환 방지. fadeInScale, fadeOut 애니메이션에서 transform 처리 */
-            transition: opacity 0.5s; 
+            transition: opacity 0.5s;
+            cursor: pointer; /* 클릭 가능하도록 커서 변경 */
         }
 
         @keyframes fadeInScale {
@@ -69,8 +69,7 @@
             }
             100% {
                 opacity: 0;
-                /* transform: scale(0.5); 제거. 물방울이 사라질 때 크기가 줄어드는 효과를 원하면 다시 추가 */
-                transform: scale(0.5); /* 0.5로 줄어들면서 사라지는 효과를 유지하려면 이 줄을 유지합니다. */
+                transform: scale(0.5);
             }
         }
     </style>
@@ -157,6 +156,7 @@
 
             const fadeOutStartTime = TOTAL_LIFETIME_MS - FADE_OUT_DURATION_MS;
             let remainingTime = TOTAL_LIFETIME_MS;
+            let countdownInterval; // setInterval ID를 저장할 변수
 
             const updateCountdown = () => {
                 const minutes = Math.floor(remainingTime / (60 * 1000));
@@ -170,10 +170,10 @@
             };
 
             updateCountdown(); // 초기 카운트다운 표시
-            const countdownInterval = setInterval(updateCountdown, 1000);
+            countdownInterval = setInterval(updateCountdown, 1000); // interval ID를 변수에 할당
 
             // 물방울 사라지는 애니메이션 시작 시점
-            setTimeout(() => {
+            const timeoutIdFadeOut = setTimeout(() => {
                 // 물방울이 아직 DOM에 있다면 애니메이션 적용
                 if (bubble.parentNode) {
                     bubble.style.animation = `fadeOut ${FADE_OUT_DURATION_MS / 1000}s forwards`;
@@ -182,7 +182,7 @@
             }, fadeOutStartTime);
 
             // 물방울 완전히 제거
-            setTimeout(() => {
+            const timeoutIdRemove = setTimeout(() => {
                 if (bubble.parentNode) {
                     bubble.remove(); // DOM에서 물방울 제거
                     // activeBubbles 배열에서 물방울 제거
@@ -192,6 +192,26 @@
                     }
                 }
             }, TOTAL_LIFETIME_MS);
+
+            // 물방울 클릭 시 사라지게 하는 이벤트 리스너 추가
+            bubble.addEventListener('click', function() {
+                // 클릭 시 바로 사라지는 애니메이션 적용 (선택 사항: 원하면 fadeOut 애니메이션을 적용할 수 있음)
+                bubble.style.animation = `fadeOut 0.3s forwards`; // 0.3초 동안 빠르게 사라지도록 설정
+                clearInterval(countdownInterval); // 카운트다운 중지
+                clearTimeout(timeoutIdFadeOut); // 예정된 fadeOut 타이머 취소
+                clearTimeout(timeoutIdRemove); // 예정된 remove 타이머 취소
+
+                // 애니메이션 종료 후 DOM에서 제거 및 배열에서 삭제
+                bubble.addEventListener('animationend', function() {
+                    if (bubble.parentNode) {
+                        bubble.remove();
+                        const index = activeBubbles.indexOf(bubble);
+                        if (index > -1) {
+                            activeBubbles.splice(index, 1);
+                        }
+                    }
+                }, { once: true }); // 한 번만 실행되도록 { once: true } 옵션 사용
+            });
         });
     </script>
 </body>
