@@ -42,13 +42,19 @@
             opacity: 0;
             transform: scale(0.2);
             display: flex;
+            flex-direction: column; /* 내용을 세로로 배치 */
             justify-content: center;
             align-items: center;
             font-size: 16px;
             color: #333;
             font-weight: bold;
             transition: opacity 0.5s;
-            cursor: pointer; /* 클릭 가능하도록 커서 변경 */
+            cursor: pointer;
+            word-break: break-all; /* 긴 텍스트 줄바꿈 */
+            text-align: center; /* 텍스트 가운데 정렬 */
+            line-height: 1.2; /* 줄 간격 조절 */
+            padding: 10px; /* 내부 여백 추가 */
+            box-sizing: border-box; /* 패딩이 크기에 포함되도록 */
         }
 
         @keyframes fadeInScale {
@@ -72,6 +78,59 @@
                 transform: scale(0.5);
             }
         }
+
+        /* 팝업 관련 스타일 */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .popup-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: left;
+            width: 300px;
+        }
+
+        .popup-content label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .popup-content input {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .popup-content button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        .popup-content button:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
@@ -80,8 +139,8 @@
     </div>
 
     <script>
-        // 상수 정의 (가독성 및 유지보수성 향상)
-        const BUBBLE_SIZE = 100; // 물방울 크기 (px)
+        // 상수 정의
+        const BUBBLE_SIZE = 200; // 물방울 크기 (px) - 2배로 키움
         const TOTAL_LIFETIME_MS = 5 * 60 * 1000; // 물방울 총 생명 주기 (5분)
         const FADE_OUT_DURATION_MS = 5 * 1000; // 물방울 사라지는 시간 (5초)
         const MAX_PLACEMENT_ATTEMPTS = 100; // 물방울 배치 시도 최대 횟수
@@ -90,9 +149,90 @@
         const activeBubbles = []; // 현재 활성화된 물방울들을 저장하는 배열
 
         document.querySelector('.bubble-button').addEventListener('click', function() {
+            createBubbleInputPopup();
+        });
+
+        function createBubbleInputPopup() {
+            // 팝업 오버레이 생성
+            const popupOverlay = document.createElement('div');
+            popupOverlay.classList.add('popup-overlay');
+
+            // 팝업 내용 컨테이너 생성
+            const popupContent = document.createElement('div');
+            popupContent.classList.add('popup-content');
+
+            // ID 입력 필드
+            const idLabel = document.createElement('label');
+            idLabel.textContent = 'ID (선택 사항):';
+            const idInput = document.createElement('input');
+            idInput.type = 'text';
+            idInput.placeholder = 'ID를 입력하세요';
+
+            // 메시지 입력 필드
+            const messageLabel = document.createElement('label');
+            messageLabel.textContent = '메시지 (선택 사항):';
+            const messageInput = document.createElement('input');
+            messageInput.type = 'text';
+            messageInput.placeholder = '간단한 메시지를 입력하세요';
+
+            // 전화번호 입력 필드
+            const phoneLabel = document.createElement('label');
+            phoneLabel.textContent = '전화번호 (XXX-XXX-XXXX):';
+            const phoneInput = document.createElement('input');
+            phoneInput.type = 'text';
+            phoneInput.placeholder = '010-1234-5678';
+            phoneInput.maxLength = 13; // XXX-XXX-XXXX 형식에 맞춰 최대 길이 설정
+
+            // 전화번호 입력 시 자동 하이픈 추가
+            phoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, ''); // 숫자만 남기기
+                let formattedValue = '';
+                if (value.length > 10) { // 010-1234-5678 (11자리)
+                    formattedValue = value.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+                } else if (value.length > 6) { // 010-123-4567 (10자리)
+                    formattedValue = value.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+                } else if (value.length > 3) {
+                    formattedValue = value.replace(/(\d{3})(\d{1,3})/, '$1-$2');
+                } else {
+                    formattedValue = value;
+                }
+                e.target.value = formattedValue;
+            });
+
+
+            // 확인 버튼
+            const confirmButton = document.createElement('button');
+            confirmButton.textContent = '확인';
+            confirmButton.addEventListener('click', function() {
+                const id = idInput.value.trim();
+                const message = messageInput.value.trim();
+                const phone = phoneInput.value.trim();
+                createBubble(id, message, phone);
+                document.body.removeChild(popupOverlay); // 팝업 닫기
+            });
+
+            // 취소 버튼
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = '취소';
+            cancelButton.addEventListener('click', function() {
+                document.body.removeChild(popupOverlay); // 팝업 닫기
+            });
+
+            popupContent.appendChild(idLabel);
+            popupContent.appendChild(idInput);
+            popupContent.appendChild(messageLabel);
+            popupContent.appendChild(messageInput);
+            popupContent.appendChild(phoneLabel);
+            popupContent.appendChild(phoneInput);
+            popupContent.appendChild(confirmButton);
+            popupContent.appendChild(cancelButton);
+            popupOverlay.appendChild(popupContent);
+            document.body.appendChild(popupOverlay);
+        }
+
+        function createBubble(id, message, phone) {
             const centeredBox = document.querySelector('.centered-box');
             
-            // 물방울이 배치될 수 있는 최대 x, y 좌표 (패딩 고려)
             const maxX = centeredBox.offsetWidth - BUBBLE_SIZE - 2 * BOX_PADDING;
             const maxY = centeredBox.offsetHeight - BUBBLE_SIZE - 2 * BOX_PADDING;
 
@@ -100,25 +240,20 @@
             let foundPosition = false;
             let attempts = 0;
 
-            // 물방울이 겹치지 않는 위치를 찾을 때까지 반복
             while (!foundPosition && attempts < MAX_PLACEMENT_ATTEMPTS) {
-                // 랜덤 위치 계산
                 startX = Math.random() * maxX + BOX_PADDING;
                 startY = Math.random() * maxY + BOX_PADDING;
 
                 let overlapping = false;
                 for (const existingBubble of activeBubbles) {
-                    // 기존 물방울의 현재 위치 가져오기 (relative to centeredBox)
                     const existingLeft = parseFloat(existingBubble.style.left);
                     const existingTop = parseFloat(existingBubble.style.top);
 
-                    // 두 물방울 중심점 간의 거리 계산
                     const distanceX = (startX + BUBBLE_SIZE / 2) - (existingLeft + BUBBLE_SIZE / 2);
                     const distanceY = (startY + BUBBLE_SIZE / 2) - (existingTop + BUBBLE_SIZE / 2);
                     const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
-                    // 두 물방울이 겹치지 않기 위한 최소 거리 (두 반지름의 합)
-                    const minDistance = BUBBLE_SIZE; // (BUBBLE_SIZE / 2) + (BUBBLE_SIZE / 2)
+                    const minDistance = BUBBLE_SIZE; 
 
                     if (distance < minDistance) {
                         overlapping = true;
@@ -132,7 +267,6 @@
                 attempts++;
             }
 
-            // 적절한 위치를 찾지 못했으면 물방울 생성 중단
             if (!foundPosition) {
                 console.warn("겹치지 않는 위치를 찾지 못했습니다. 물방울 생성을 중단합니다.");
                 return;
@@ -145,18 +279,36 @@
             bubble.style.left = `${startX}px`;
             bubble.style.top = `${startY}px`;
 
+            // 물방울 내부에 텍스트 추가
+            if (id) {
+                const idSpan = document.createElement('span');
+                idSpan.textContent = `ID: ${id}`;
+                bubble.appendChild(idSpan);
+            }
+            if (message) {
+                const messageSpan = document.createElement('span');
+                messageSpan.textContent = `메시지: ${message}`;
+                bubble.appendChild(messageSpan);
+            }
+            if (phone) {
+                const phoneSpan = document.createElement('span');
+                phoneSpan.textContent = `전화: ${phone}`;
+                bubble.appendChild(phoneSpan);
+            }
+            
             const countdownText = document.createElement('span');
+            countdownText.style.marginTop = 'auto'; // 하단 정렬을 위해
             bubble.appendChild(countdownText);
 
-            centeredBox.appendChild(bubble);
-            activeBubbles.push(bubble); // 생성된 물방울을 배열에 추가
 
-            // 물방울 나타나는 애니메이션 적용
+            centeredBox.appendChild(bubble);
+            activeBubbles.push(bubble);
+
             bubble.style.animation = 'fadeInScale 0.5s forwards';
 
             const fadeOutStartTime = TOTAL_LIFETIME_MS - FADE_OUT_DURATION_MS;
             let remainingTime = TOTAL_LIFETIME_MS;
-            let countdownInterval; // setInterval ID를 저장할 변수
+            let countdownInterval;
 
             const updateCountdown = () => {
                 const minutes = Math.floor(remainingTime / (60 * 1000));
@@ -169,23 +321,19 @@
                 }
             };
 
-            updateCountdown(); // 초기 카운트다운 표시
-            countdownInterval = setInterval(updateCountdown, 1000); // interval ID를 변수에 할당
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
 
-            // 물방울 사라지는 애니메이션 시작 시점
             const timeoutIdFadeOut = setTimeout(() => {
-                // 물방울이 아직 DOM에 있다면 애니메이션 적용
                 if (bubble.parentNode) {
                     bubble.style.animation = `fadeOut ${FADE_OUT_DURATION_MS / 1000}s forwards`;
-                    clearInterval(countdownInterval); // 카운트다운 중지
+                    clearInterval(countdownInterval);
                 }
             }, fadeOutStartTime);
 
-            // 물방울 완전히 제거
             const timeoutIdRemove = setTimeout(() => {
                 if (bubble.parentNode) {
-                    bubble.remove(); // DOM에서 물방울 제거
-                    // activeBubbles 배열에서 물방울 제거
+                    bubble.remove();
                     const index = activeBubbles.indexOf(bubble);
                     if (index > -1) {
                         activeBubbles.splice(index, 1);
@@ -193,15 +341,12 @@
                 }
             }, TOTAL_LIFETIME_MS);
 
-            // 물방울 클릭 시 사라지게 하는 이벤트 리스너 추가
             bubble.addEventListener('click', function() {
-                // 클릭 시 바로 사라지는 애니메이션 적용 (선택 사항: 원하면 fadeOut 애니메이션을 적용할 수 있음)
-                bubble.style.animation = `fadeOut 0.3s forwards`; // 0.3초 동안 빠르게 사라지도록 설정
-                clearInterval(countdownInterval); // 카운트다운 중지
-                clearTimeout(timeoutIdFadeOut); // 예정된 fadeOut 타이머 취소
-                clearTimeout(timeoutIdRemove); // 예정된 remove 타이머 취소
+                bubble.style.animation = `fadeOut 0.3s forwards`;
+                clearInterval(countdownInterval);
+                clearTimeout(timeoutIdFadeOut);
+                clearTimeout(timeoutIdRemove);
 
-                // 애니메이션 종료 후 DOM에서 제거 및 배열에서 삭제
                 bubble.addEventListener('animationend', function() {
                     if (bubble.parentNode) {
                         bubble.remove();
@@ -210,9 +355,9 @@
                             activeBubbles.splice(index, 1);
                         }
                     }
-                }, { once: true }); // 한 번만 실행되도록 { once: true } 옵션 사용
+                }, { once: true });
             });
-        });
+        }
     </script>
 </body>
 </html>
