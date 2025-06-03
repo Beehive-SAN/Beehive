@@ -43,8 +43,8 @@
             transform: scale(0.2);
             display: flex;
             flex-direction: column; /* 내용을 세로로 배치 */
-            justify-content: center;
-            align-items: center;
+            justify-content: center; /* 세로 방향 가운데 정렬 */
+            align-items: center; /* 가로 방향 가운데 정렬 */
             font-size: 16px;
             color: #333;
             font-weight: bold;
@@ -55,6 +55,15 @@
             line-height: 1.2; /* 줄 간격 조절 */
             padding: 10px; /* 내부 여백 추가 */
             box-sizing: border-box; /* 패딩이 크기에 포함되도록 */
+        }
+
+        /* 물방울 내부 텍스트 간격 조절 */
+        .bubble > span {
+            flex-grow: 1; /* 각 span이 사용 가능한 공간을 동일하게 차지하도록 함 */
+            display: flex; /* 내부 텍스트를 정렬하기 위해 flexbox 사용 */
+            justify-content: center; /* 가로 중앙 정렬 */
+            align-items: center; /* 세로 중앙 정렬 */
+            margin-bottom: 0; /* 기존 margin-bottom 제거 */
         }
 
         @keyframes fadeInScale {
@@ -161,41 +170,46 @@
             const popupContent = document.createElement('div');
             popupContent.classList.add('popup-content');
 
-            // ID 입력 필드
+            // ID 입력 필드 (필수)
             const idLabel = document.createElement('label');
-            idLabel.textContent = 'ID (선택 사항):';
+            idLabel.textContent = 'ID (필수):';
             const idInput = document.createElement('input');
             idInput.type = 'text';
             idInput.placeholder = 'ID를 입력하세요';
 
-            // 메시지 입력 필드
+            // 메시지 입력 필드 (필수)
             const messageLabel = document.createElement('label');
-            messageLabel.textContent = '메시지 (선택 사항):';
+            messageLabel.textContent = '메시지 (필수):';
             const messageInput = document.createElement('input');
             messageInput.type = 'text';
             messageInput.placeholder = '간단한 메시지를 입력하세요';
 
-            // 전화번호 입력 필드
-            const phoneLabel = document.createElement('label');
-            phoneLabel.textContent = '전화번호 (XXX-XXX-XXXX):';
-            const phoneInput = document.createElement('input');
-            phoneInput.type = 'text';
-            phoneInput.placeholder = '010-1234-5678';
-            phoneInput.maxLength = 13; // XXX-XXX-XXXX 형식에 맞춰 최대 길이 설정
+            // 호스트 번호 입력 필드 (필수)
+            const hostPhoneLabel = document.createElement('label');
+            hostPhoneLabel.textContent = '호스트 번호 (XXX-XXX-XXXX):';
+            const hostPhoneInput = document.createElement('input');
+            hostPhoneInput.type = 'text';
+            hostPhoneInput.placeholder = '010-123-4567';
+            hostPhoneInput.maxLength = 12; // XXX-XXX-XXXX 형식에 맞춰 최대 길이 설정 (하이픈 포함 12자리)
 
-            // 전화번호 입력 시 자동 하이픈 추가
-            phoneInput.addEventListener('input', function(e) {
+            // 호스트 번호 입력 시 자동 하이픈 추가 및 길이 제한
+            hostPhoneInput.addEventListener('input', function(e) {
                 let value = e.target.value.replace(/\D/g, ''); // 숫자만 남기기
                 let formattedValue = '';
-                if (value.length > 10) { // 010-1234-5678 (11자리)
-                    formattedValue = value.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-                } else if (value.length > 6) { // 010-123-4567 (10자리)
+
+                if (value.length > 7) { // 010-123-4567 (7자리 숫자 이후)
                     formattedValue = value.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-                } else if (value.length > 3) {
+                } else if (value.length > 3) { // 010-123 (3자리 숫자 이후)
                     formattedValue = value.replace(/(\d{3})(\d{1,3})/, '$1-$2');
                 } else {
                     formattedValue = value;
                 }
+                
+                // 최대 길이 초과 방지
+                if (formattedValue.length > hostPhoneInput.maxLength) {
+                    formattedValue = formattedValue.slice(0, hostPhoneInput.maxLength);
+                }
+
                 e.target.value = formattedValue;
             });
 
@@ -206,8 +220,32 @@
             confirmButton.addEventListener('click', function() {
                 const id = idInput.value.trim();
                 const message = messageInput.value.trim();
-                const phone = phoneInput.value.trim();
-                createBubble(id, message, phone);
+                const hostPhone = hostPhoneInput.value.trim();
+
+                // ID 유효성 검사
+                if (!id) {
+                    alert('ID는 반드시 입력해야 합니다.');
+                    return;
+                }
+
+                // 메시지 유효성 검사
+                if (!message) {
+                    alert('메시지는 반드시 입력해야 합니다.');
+                    return;
+                }
+
+                // 호스트 번호 유효성 검사
+                const phoneRegex = /^\d{3}-\d{3}-\d{4}$/; // XXX-XXX-XXXX 형식만 허용
+                if (!hostPhone) {
+                    alert('호스트 번호는 반드시 입력해야 합니다.');
+                    return;
+                }
+                if (!phoneRegex.test(hostPhone)) {
+                    alert('호스트 번호 형식이 올바르지 않습니다. (예: 010-123-4567)');
+                    return;
+                }
+
+                createBubble(id, message, hostPhone);
                 document.body.removeChild(popupOverlay); // 팝업 닫기
             });
 
@@ -222,8 +260,8 @@
             popupContent.appendChild(idInput);
             popupContent.appendChild(messageLabel);
             popupContent.appendChild(messageInput);
-            popupContent.appendChild(phoneLabel);
-            popupContent.appendChild(phoneInput);
+            popupContent.appendChild(hostPhoneLabel);
+            popupContent.appendChild(hostPhoneInput);
             popupContent.appendChild(confirmButton);
             popupContent.appendChild(cancelButton);
             popupOverlay.appendChild(popupContent);
@@ -280,24 +318,21 @@
             bubble.style.top = `${startY}px`;
 
             // 물방울 내부에 텍스트 추가
-            if (id) {
-                const idSpan = document.createElement('span');
-                idSpan.textContent = `${id}`;
-                bubble.appendChild(idSpan);
-            }
-            if (message) {
-                const messageSpan = document.createElement('span');
-                messageSpan.textContent = `${message}`;
-                bubble.appendChild(messageSpan);
-            }
-            if (phone) {
-                const phoneSpan = document.createElement('span');
-                phoneSpan.textContent = `${phone}`;
-                bubble.appendChild(phoneSpan);
-            }
+            // ID와 메시지가 필수가 되었으므로, 항상 텍스트가 추가됩니다.
+            const idSpan = document.createElement('span');
+            idSpan.textContent = `${id}`;
+            bubble.appendChild(idSpan);
+            
+            const messageSpan = document.createElement('span');
+            messageSpan.textContent = `${message}`;
+            bubble.appendChild(messageSpan);
+            
+            const phoneSpan = document.createElement('span');
+            phoneSpan.textContent = `${phone}`;
+            bubble.appendChild(phoneSpan);
             
             const countdownText = document.createElement('span');
-            countdownText.style.marginTop = 'auto'; // 하단 정렬을 위해
+            // countdownText.style.marginTop = 'auto'; // 하단 정렬을 위해 -> 이 부분 제거
             bubble.appendChild(countdownText);
 
 
