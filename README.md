@@ -1,1 +1,1 @@
-# https://beehive-san.github.io/Beehive.github.io/
+# https://beehive-san.github.io/Beehive/
